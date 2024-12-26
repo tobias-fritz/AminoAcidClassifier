@@ -105,7 +105,6 @@ def run():
     with open("amino_acids.pdb", "w") as f:
         f.write("".join(aas))
 
-@deprecated
 def get_amino_acids_from_file(pdb_file, out_file=None, write=False):
     """
     Extract amino acids from a PDB file and optionally write to an output file.

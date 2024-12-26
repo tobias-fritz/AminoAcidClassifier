@@ -7,19 +7,22 @@ class AminoAcidDataset(torch.utils.data.Dataset):
     This class loads the amino acid dataset from a PDB file and stores the coordinates and elements of each atom in the structure.
 
     Args:
-    pdb_file (str): The path to the PDB file.
-    padding (bool): If True, the coordinates and elements will be padded to have the same length for all residues.
+        pdb_file (str): The path to the PDB file.
+        padding (bool): If True, the coordinates and elements will be padded to have the same length for all residues.
     '''
 
     def __init__(self, pdb_file: str, padding: bool = False) -> None:
-        self._amino_acids = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU',
-                            'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 
-                            'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL']
+        self._amino_acids = [
+            'ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 
+            'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 
+            'TYR', 'VAL'
+        ]
         self._elements = ['C', 'N', 'O', 'S']
 
         self.coordinates = []
         self.elements = []
         self.residue = []
+        self.input_shape = None
 
         with open(pdb_file, 'r') as f:
             residue_cords = []
@@ -40,12 +43,10 @@ class AminoAcidDataset(torch.utils.data.Dataset):
                     self.elements.append(torch.stack(residue_elements))
                     self.residue.append(residue_name[0])
                     residue_cords, residue_elements, residue_name = [], [], []
-
-        if padding == True:
+        
+        if padding:
             self.coordinates = nn.utils.rnn.pad_sequence(self.coordinates, batch_first=True)
             self.elements = nn.utils.rnn.pad_sequence(self.elements, batch_first=True)
-
-            # get the input shape quality of life
             self.input_shape = self._get_input_shape()
     
     def one_hot_residues(self, residue: str) -> torch.Tensor:

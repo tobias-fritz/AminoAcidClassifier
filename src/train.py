@@ -1,5 +1,6 @@
 import torch
 from torchmetrics import Accuracy
+from torch.utils.data import DataLoader
 
 def train_model(model: torch.nn.Module, 
                 data_loader: torch.utils.data.DataLoader,
@@ -82,16 +83,47 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
     model.eval()  # Set the model to evaluation mode
     accuracy =  Accuracy(task='MULTICLASS', num_classes=20)  # Adjust num_classes as needed
     accuracy.reset() # Reset the running accuracy
-    for coordinates, elements, residue in data_loader:
-        # Combine coordinates and elements into a single tensor
-        input_data = torch.cat((coordinates, elements), dim=2)
-        input_data = input_data.unsqueeze(1)
+    
+    with torch.no_grad():
+        for coordinates, elements, residue in data_loader:
+            # Combine coordinates and elements into a single tensor
+            input_data = torch.cat((coordinates, elements), dim=2)
+            input_data = input_data.unsqueeze(1)
 
-        # Forward pass
-        output = model(input_data)
+            # Forward pass
+            output = model(input_data)
 
-        # Calculate the accuracy
-        target = torch.argmax(residue, dim=1)
-        accuracy.update(output, target)
+            # Calculate the accuracy
+            target = torch.argmax(residue, dim=1)
+            accuracy.update(output, target)
 
     return {"accuracy": accuracy.compute().item()}
+
+def get_failed_predictions(model: torch.nn.Module, dataset: torch.utils.data.Dataset) -> list:
+    """
+    Get the failed predictions of a model on a dataset.
+
+    Args:
+        model (torch.nn.Module): The model to evaluate.
+        dataset (torch.utils.data.Dataset): Dataset for the evaluation data.
+
+    Returns:
+        list: A list of dictionaries containing the actual and predicted labels for the failed predictions.
+    """
+    failed_predictions = []
+    model.eval()  # Set the model to evaluation mode
+    resid_dict = dataset._amino_acids
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    for coordinates, elements, residue in dataloader:
+        input_data = torch.cat((coordinates, elements), dim=2)
+        input_data = input_data.unsqueeze(1)
+        output = model(input_data)
+        target = torch.argmax(residue, dim=1)
+        for i in range(len(target)):
+            if torch.argmax(output[i]) != target[i]:
+                failed_predictions.append({
+                    "actual_label": resid_dict[int(target[i])],
+                    "predicted_label": resid_dict[int(torch.argmax(output[i]))]
+                })
+
+    return failed_predictions

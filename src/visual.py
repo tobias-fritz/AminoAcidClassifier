@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import torch
-from torch import nn
+from torchmetrics import ConfusionMatrix
 from typing import Dict, Tuple, Any
 from .data import AminoAcidDataset
+import seaborn as sns
+import numpy as np
 
 def plot_aa_distributions(dataset: AminoAcidDataset) -> Dict[str, Any]:
     """
@@ -69,3 +71,46 @@ def plot_predicted_vs_true(model: nn.Module, dataloader_tuple: Tuple[torch.Tenso
 
     return {"fig": fig, "ax": ax}
 
+
+def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader) -> Dict[str, Any]:
+    """
+    Plots the confusion matrix for the given model and dataloader.
+
+    Args:
+        model (torch.nn.Module): The trained model for prediction.
+        dataloader (torch.utils.data.DataLoader): The dataloader containing the dataset.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the figure and axis.
+    """
+    amino_acids = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU',
+                'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 
+                'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL']
+    
+    # Initialize the confusion matrix
+    confusion_matrix = ConfusionMatrix(num_classes=20, task='MULTICLASS')
+    confusion_matrix.reset()
+
+    # Update the confusion matrix with the predictions
+    with torch.no_grad():   
+        for i, (coordinates, elements, residue) in enumerate(dataloader):
+            input_data = torch.cat((coordinates, elements), dim=1)
+            output = model(input_data)
+            confusion_matrix.update(torch.argmax(output), torch.argmax(residue))
+
+    # Compute the confusion matrix and normalize it
+    confusion_matrix = confusion_matrix.compute().numpy()
+    confusion_matrix = confusion_matrix / confusion_matrix.sum(axis=1, keepdims=True) # Normalize the confusion matrix
+    confusion_matrix = np.where(confusion_matrix > 0, confusion_matrix, np.nan)  # Only show any values > 0
+     
+    fig, ax = plt.subplots(figsize=(10,10))
+    ax = sns.heatmap(confusion_matrix, square=True, annot=True, xticklabels=amino_acids, yticklabels=amino_acids, cmap='viridis', fmt='.2f', cbar=False, linewidths=0.5, linecolor='black')
+    
+    for _, spine in ax.spines.items():
+        spine.set_visible(True)
+
+    ax.set_title('Confusion matrix')
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('True')
+
+    return {"fig": fig, "ax": ax}

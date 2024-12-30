@@ -1,5 +1,5 @@
 import torch
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, Precision, Recall
 from torch.utils.data import DataLoader
 
 def train_model(model: torch.nn.Module, 
@@ -83,7 +83,11 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
     model.eval()  # Set the model to evaluation mode
     accuracy =  Accuracy(task='MULTICLASS', num_classes=20)  # Adjust num_classes as needed
     accuracy.reset() # Reset the running accuracy
-    
+    precision = Precision(num_classes=20, average='macro', task='MULTICLASS')
+    precision.reset()
+    recall = Recall(num_classes=20, average='macro', task='MULTICLASS')
+    recall.reset()
+
     with torch.no_grad():
         for coordinates, elements, residue in data_loader:
             # Combine coordinates and elements into a single tensor
@@ -96,8 +100,10 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
             # Calculate the accuracy
             target = torch.argmax(residue, dim=1)
             accuracy.update(output, target)
+            precision.update(output, target)
+            recall.update(output, target)
 
-    return {"accuracy": accuracy.compute().item()}
+    return {"accuracy": accuracy.compute().item(), "precision": precision.compute().item(), "recall": recall.compute().item()}
 
 def get_failed_predictions(model: torch.nn.Module, dataset: torch.utils.data.Dataset) -> list:
     """

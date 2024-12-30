@@ -34,7 +34,7 @@ def plot_aa_distributions(dataset: AminoAcidDataset) -> Dict[str, Any]:
     
     return {"fig":fig, "ax":ax, "counter":counter_dict}
 
-def plot_predicted_vs_true(model: nn.Module, dataloader_tuple: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Dict[str, Any]:
+def plot_predicted_vs_true(model: torch.nn.Module, dataloader_tuple: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Dict[str, Any]:
     """
     Plots the predicted vs true amino acid distribution.
 
@@ -93,11 +93,13 @@ def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.D
 
     # Update the confusion matrix with the predictions
     with torch.no_grad():   
-        for i, (coordinates, elements, residue) in enumerate(dataloader):
-            input_data = torch.cat((coordinates, elements), dim=1)
+        for coordinates, elements, residue in dataloader:
+            input_data = torch.cat((coordinates, elements), dim=2)
+            input_data = input_data.unsqueeze(1)
             output = model(input_data)
-            confusion_matrix.update(torch.argmax(output), torch.argmax(residue))
-
+            target = torch.argmax(residue, dim=1)
+            confusion_matrix.update(output, target)
+            
     # Compute the confusion matrix and normalize it
     confusion_matrix = confusion_matrix.compute().numpy()
     confusion_matrix = confusion_matrix / confusion_matrix.sum(axis=1, keepdims=True) # Normalize the confusion matrix

@@ -6,7 +6,8 @@ def train_model(model: torch.nn.Module,
                 data_loader: torch.utils.data.DataLoader,
                 criterion: torch.nn.Module,
                 optimizer: torch.optim.Optimizer,
-                n_epochs: int) -> dict:
+                n_epochs: int,
+                coord_only: bool = False) -> dict:
     """
     Train a PyTorch model.
 
@@ -24,12 +25,24 @@ def train_model(model: torch.nn.Module,
     epoch_lr = []
     model.train()  # Set the model to training mode
 
+    # check if cuda is available
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        model.to(device)
+
     for epoch in range(n_epochs):
         epoch_loss = 0.0
         for coordinates, elements, residue in data_loader:
             # Combine coordinates and elements into a single tensor
-            input_data = torch.cat((coordinates, elements), dim=2)
-            input_data = input_data.unsqueeze(1)
+            if not coord_only:
+                if torch.cuda.is_available():
+                    coordinates, elements, residue = coordinates.to(device), elements.to(device), residue.to(device)
+                input_data = torch.cat((coordinates, elements), dim=2)
+                input_data = input_data.unsqueeze(1)
+            else:
+                if torch.cuda.is_available():
+                    coordinates, residue = coordinates.to(device), residue.to(device)
+                input_data = coordinates.unsqueeze(1)
 
             # Forward pass
             output = model(input_data)
@@ -69,7 +82,7 @@ def train_model(model: torch.nn.Module,
     return training_dict
 
 
-def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader) -> dict:
+def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, coord_only: bool = False) -> dict:
     """
     Evaluate a PyTorch model on a dataset.
 
@@ -88,11 +101,22 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
     recall = Recall(num_classes=20, average='macro', task='MULTICLASS')
     recall.reset()
 
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        model.to(device)
+
     with torch.no_grad():
         for coordinates, elements, residue in data_loader:
             # Combine coordinates and elements into a single tensor
-            input_data = torch.cat((coordinates, elements), dim=2)
-            input_data = input_data.unsqueeze(1)
+            if not coord_only:
+                if torch.cuda.is_available():
+                    coordinates, elements, residue = coordinates.to(device), elements.to(device), residue.to(device)
+                input_data = torch.cat((coordinates, elements), dim=2)
+                input_data = input_data.unsqueeze(1)
+            else:
+                if torch.cuda.is_available():
+                    coordinates, residue = coordinates.to(device), residue.to(device)
+                input_data = coordinates.unsqueeze(1)   
 
             # Forward pass
             output = model(input_data)
@@ -105,7 +129,7 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
 
     return {"accuracy": accuracy.compute().item(), "precision": precision.compute().item(), "recall": recall.compute().item()}
 
-def get_failed_predictions(model: torch.nn.Module, dataset: torch.utils.data.Dataset) -> list:
+def get_failed_predictions(model: torch.nn.Module, dataset: torch.utils.data.Dataset, coord_only: bool = False) -> list:
     """
     Get the failed predictions of a model on a dataset.
 
@@ -120,9 +144,21 @@ def get_failed_predictions(model: torch.nn.Module, dataset: torch.utils.data.Dat
     model.eval()  # Set the model to evaluation mode
     resid_dict = dataset._amino_acids
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        model.to(device)
+
     for coordinates, elements, residue in dataloader:
-        input_data = torch.cat((coordinates, elements), dim=2)
-        input_data = input_data.unsqueeze(1)
+        if not coord_only:
+            if torch.cuda.is_available():
+                coordinates, elements, residue = coordinates.to(device), elements.to(device), residue.to(device)
+            input_data = torch.cat((coordinates, elements), dim=2)
+            input_data = input_data.unsqueeze(1)
+        else:
+            if torch.cuda.is_available():
+                coordinates, residue = coordinates.to(device), residue.to(device)
+            input_data = coordinates.unsqueeze(1)
         output = model(input_data)
         target = torch.argmax(residue, dim=1)
         for i in range(len(target)):

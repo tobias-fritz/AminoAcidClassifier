@@ -1,3 +1,4 @@
+import sys
 import torch
 from torchmetrics import Accuracy, Precision, Recall
 from torch.utils.data import DataLoader
@@ -76,7 +77,7 @@ def train_model(model: torch.nn.Module,
             break
 
         print(f'Epoch {epoch + 1}/{n_epochs}, Loss: {epoch_loss:.5f}', end='\r')
-
+        sys.stdout.flush()
     training_dict = { 'model': model, 'optimizer': optimizer, 'total_loss': total_loss, 'learning_rate': epoch_lr }
     
     return training_dict

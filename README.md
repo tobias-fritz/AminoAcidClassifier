@@ -1,6 +1,12 @@
 # Amino Acid Classification
 
-This project focuses on the classification of amino acids using a Convolutional Neural Network (CNN). The dataset is derived from PDB files, and the model is trained to predict the type of amino acid based on atomic coordinates and elements.
+This project focuses on the classification of amino acids using a Convolutional Neural Network (CNN). The dataset is derived from Protein Data Bank (PDB) files, which contain detailed information about the 3D structures of proteins and nucleic acids. The model is trained to predict the type of amino acid based on atomic coordinates and elements, leveraging the spatial relationships between atoms to make accurate classifications. In a second step, we exclude the element information to simulate more realistic use-cases and analyze how this affects the model's performance, particularly in distinguishing amino acids with similar atomic arrangements but different element types in key positions.
+
+Amino acids are the building blocks of proteins, and their classification is crucial for understanding protein structure and function. Each amino acid has unique properties that influence how it interacts with other molecules. In the simplest terms, they can be described by a set of 3D coordinates of their atoms and the corresponding elements. Accurate classification can aid in various biological and medical research areas, including drug design and protein engineering.
+
+Convolutional Neural Networks (CNNs) are a class of deep learning models particularly well-suited for spatial data. By applying convolutional layers, the model can capture local patterns and hierarchical features, making it effective for tasks involving structured data like the atomic coordinates of amino acids. This project demonstrates the application of CNNs to classifying amino acid coordinates, showcasing their versatility and power in bioinformatics.
+
+While this project primarily serves as an example of using CNNs with high-dimensional data, potential applications of a pretrained model include assigning amino acid residues to electron density maps derived from X-ray crystallography or cryo-EM data. 
 
 ## Notebooks
 
@@ -67,6 +73,12 @@ After training, evaluate the model's performance using the test dataset. The eva
 ## Results
 
 The model achieves high accuracy in classifying amino acids. The training and evaluation results are visualized in the notebooks.
+
+## Try it on Binder
+
+You can try out the notebooks using Binder. Click the link below to launch the notebooks in an interactive environment:
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tobias/cell_finder/main)
 
 ## License
 

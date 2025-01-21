@@ -3,7 +3,11 @@ import requests
 import contextlib
 from urllib.request import urlopen
 import torch
-from .data import AminoAcidDataset
+import concurrent.futures
+from itertools import islice
+import gzip
+import time
+from .dataset import AminoAcidDataset
 
 def download_pdb(pdb_id, save_file=False, output_dir=None):
     """
@@ -79,15 +83,19 @@ def get_amino_acids(pdb: str):
     out_list.append("END\n")
     return out_list
 
-def run():
+def run(pdb_ids: list, out_path: str):
+    """Main function to download PDB files, extract amino acids, and save them to a file.
+
+    Args:   
+        pdb_ids (list): List of PDB
+
+    Returns:
+        None
     """
-    Main function to download PDB files, extract amino acids, and save them to a file.
-    """
-    all_pdbids = list_all_pdbids()
-    n = 300
+    
     aas = []
-    for i, pdb_id in enumerate(all_pdbids[:n]):
-        print(f"Downloading {pdb_id} {i+1}/{len(all_pdbids[:n])}", end="\r")
+    for i, pdb_id in enumerate(pdb_ids[:]):
+        print(f"Downloading {pdb_id} {i+1}/{len(pdb_ids[:])}", end="\r")
         pdb = download_pdb(pdb_id)
         aas += get_amino_acids(pdb)
 
@@ -102,7 +110,7 @@ def run():
     for i in elements_to_remove[::-1]:
         aas.pop(i)
 
-    with open("amino_acids.pdb", "w") as f:
+    with open(out_path, "w") as f:
         f.write("".join(aas))
 
 def get_amino_acids_from_file(pdb_file, out_file=None, write=False):
@@ -169,18 +177,19 @@ def rotate_residue(coordinates: torch.Tensor, phi: float, psi: float, theta: flo
     Returns:
         torch.Tensor: Rotated coordinates.
     """
+
     phi, psi, theta = torch.deg2rad(torch.tensor(phi)), torch.deg2rad(torch.tensor(psi)), torch.deg2rad(torch.tensor(theta))
-    # rotate the molecule by phi degrees around the x-axis
+    # Rotate the molecule by phi degrees around the x-axis
     rotation_matrix = torch.tensor([[1, 0, 0],
                                     [0, torch.cos(phi), -torch.sin(phi)],
                                     [0, torch.sin(phi), torch.cos(phi)]])
     rotated_residue = torch.matmul(coordinates, rotation_matrix)
-    # rotate the molecule by psi degrees around the y-axis
+    # Rotate the molecule by psi degrees around the y-axis
     rotation_matrix = torch.tensor([[torch.cos(psi), 0, torch.sin(psi)],
                                     [0, 1, 0],
                                     [-torch.sin(psi), 0, torch.cos(psi)]])
     rotated_residue = torch.matmul(rotated_residue, rotation_matrix)
-    # rotate the molecule by theta degrees around the z-axis
+    # Rotate the molecule by theta degrees around the z-axis
     rotation_matrix = torch.tensor([[torch.cos(theta), -torch.sin(theta), 0],
                                     [torch.sin(theta), torch.cos(theta), 0],
                                     [0, 0, 1]])
@@ -226,4 +235,168 @@ def augment_dataset(dataset: AminoAcidDataset, output_file: str, n_orientations:
     with open(output_file, 'w') as f:
         f.writelines(augmented_lines)
 
+def process_pdb_res_download(pdbid: str) -> tuple:
+    """Download a pdb file and extract resolution
+
+    Arguments:
+        pdbid (str): The pdb id to process
+
+    Returns:
+        tuple: The pdbid and resolution
+    """
+
+    # Download the pdb file
+    pdb = download_pdb(pdbid) 
+    # Extract the resolution
+    try:
+      resolution = get_resolution(pdb) 
+    except:
+      return pdbid, None
+    # Return the pdbid and resolution
+    if resolution:
+        try:
+            resolution = float(resolution)
+            return pdbid, resolution
+        except:
+            return pdbid, None
+    return pdbid, None
+
+
+def get_resolution(pdb:str) -> str:
+    """ Get the resolution of a PDB file.
+
+    Args:
+        pdb: PDB file content as a string
+
+    Returns:
+        Resolution of the PDB file
+    """
+    
+    for line in pdb.split("\n")[:100]:
+        #print(line)
+        if line.startswith("REMARK   2 RESOLUTION."):
+            resolution = line.split()[3]
+            #print(resolution)
+            return resolution
+    return None
+
+def read_pdb(fname: str) -> str:
+    """ Read a PDB file.
+
+    Args:
+        fname: Path to the PDB file in .ent.gz format
+
+    Returns:
+        PDB file content as a string
+    """
+
+    with gzip.open(fname, 'rb') as file:
+        content = file.read()
+        pdb = content.decode('utf-8')
+    return pdb
+
+def process_pdb(pdb_info: tuple) -> tuple:
+    """ Process a PDB file to get the resolution.
+
+    Args:
+        pdb_info: Tuple with PDB ID and PDB file path
+
+    Returns:
+        Tuple with PDB ID and resolution
+    """
+
+    pdbid, pdb_file = pdb_info
+    pdb = read_pdb(pdb_file)
+    #print(pdb)
+    try:
+      resolution = get_resolution(pdb)
+    except:
+      return pdbid, None
+    if resolution:
+        try:
+            resolution = float(resolution)
+            return pdbid, resolution
+        except:
+            return pdbid, None
+    return pdbid, None
+
+def batched(iterable: iter, n: int) -> iter:
+    """ Yield batches of size n from an iterable.
+
+    Args:
+        iterable: Iterable object
+        n: Batch size
+
+    Returns:
+        Batch of size n
+    """
+    it = iter(iterable)
+    while batch := list(islice(it, n)):
+        yield batch
+
+def estimate_time(batch_num: int, total: int, time_per_batch: int, num_batches: int) -> None:
+    """ Print the estimated time remaining for the batch processing.
+
+    Args:
+        batch_num: Current batch number
+        total: Total number of batches
+        time_per_batch: Time taken per batch
+        num_batches: Total number
+
+    Returns:
+        None
+    """
+    print(f"Batch {batch_num}/{total} done in {round(time_per_batch,1)}s. Estimated time remaining (min:s): \
+          {time.strftime('%M:%S', time.gmtime(time_per_batch * (num_batches - batch_num)))}", end="\r")
+    
+def get_id_and_ressolution(subset_ids: list, subset_files: list, batch_size: int=40) -> dict:
+    """ Get the resolution for a subset of PDBs
+
+    Args:
+        subset_ids: List of PDB IDs
+        subset_files: List of PDB files
+        batch_size: Number of PDBs to process in parallel
+
+    Returns:
+        Dictionary with PDB ID as key and resolution as value
+    """
+    pdb_resolution = {}
+
+    # Process the PDBs in batches
+    for batch_num, batch in enumerate(batched(zip(subset_ids, subset_files), batch_size)):
+        start_time = time.time()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = list(executor.map(process_pdb, batch))
+        estimate_time(batch_num, len(subset_ids)//batch_size, time.time() - start_time, len(subset_ids)//batch_size)
+        # Store the results
+        for pdbid, resolution in results:
+            pdb_resolution[pdbid] = resolution
+    return pdb_resolution
+
+
+def download_all_pdbs(output_dir: str) -> None:
+    """ Download all PDB files from the Protein Data Bank.
+
+    This script is based on a bash script published on the PDB website and written by T. Solomon
+
+    Args:
+        output_dir: Directory to save the PDB files
+
+    Returns:
+        None
+    """
+    
+    # Output directory
+    MIRRORDIR = output_dir
+    # Log file
+    LOGFILE = os.path.join(output_dir, 'logs.txt')
+    # Rsync location
+    RSYNC = '/usr/bin/rsync'
+
+    # Server and port
+    SERVER = 'rsync.wwpdb.org::ftp'
+    PORT = 33444
+
+    # Run the rsync command
+    os.system(f'{RSYNC} -rlpt -v -z --delete --port={PORT} {SERVER}/data/structures/divided/pdb/ {MIRRORDIR} > {LOGFILE} 2>/dev/null')
 

@@ -67,13 +67,13 @@ def get_amino_acids(pdb: str):
     previous_aa_name = None
 
     for line in pdb.split("\n"):
-        if line.startswith("ATOM") and line[17:20] in amino_acids and line[13:16] != "OXT":
+        if line.startswith("ATOM") and line[17:20] in amino_acids and line[13:16] != "OXT" and line[13:14] != "H" and line[13:14] in ["N", "C", "O", "S"]:
             current_aa_num = line[22:26]
             counter += 1
             if current_aa_num != previous_aa_num:
                 if previous_aa_name and counter != amino_acid_lengths[previous_aa_name]:
                     out_list = out_list[:-counter]
-                    print(f"Deleted {previous_aa_name} with {counter} entries")
+                    #print(f"Deleted {previous_aa_name} with {counter} entries")
                 counter = 0
                 if previous_aa_num:
                     out_list.append("END\n")
@@ -83,7 +83,7 @@ def get_amino_acids(pdb: str):
     out_list.append("END\n")
     return out_list
 
-def run(pdb_ids: list, out_path: str):
+def run(pdb_info: list, out_path: str, download=True):
     """Main function to download PDB files, extract amino acids, and save them to a file.
 
     Args:   
@@ -93,10 +93,14 @@ def run(pdb_ids: list, out_path: str):
         None
     """
     
+    
     aas = []
-    for i, pdb_id in enumerate(pdb_ids[:]):
-        print(f"Downloading {pdb_id} {i+1}/{len(pdb_ids[:])}", end="\r")
-        pdb = download_pdb(pdb_id)
+    for i, (pdb_id, pdb_file) in enumerate(pdb_info):
+        print(f"Processing {pdb_id} {i+1}/{len(pdb_info)}", end="\r")
+        if not download:
+            pdb = download_pdb(pdb_id)
+        else:
+            pdb = read_pdb(pdb_file)
         aas += get_amino_acids(pdb)
 
     while aas[0] == "END\n":
@@ -110,8 +114,11 @@ def run(pdb_ids: list, out_path: str):
     for i in elements_to_remove[::-1]:
         aas.pop(i)
 
+    print(f"Saving to {out_path}")
     with open(out_path, "w") as f:
         f.write("".join(aas))
+
+
 
 def get_amino_acids_from_file(pdb_file, out_file=None, write=False):
     """
@@ -232,6 +239,7 @@ def augment_dataset(dataset: AminoAcidDataset, output_file: str, n_orientations:
                     f'{rotated_coordinates[j][2]:8.3f}    1.00  0.00\n'
                 )
             augmented_lines.append('END\n')
+    print(f"Augmented dataset saved to {output_file}", end="\r")
     with open(output_file, 'w') as f:
         f.writelines(augmented_lines)
 
@@ -400,3 +408,17 @@ def download_all_pdbs(output_dir: str) -> None:
     # Run the rsync command
     os.system(f'{RSYNC} -rlpt -v -z --delete --port={PORT} {SERVER}/data/structures/divided/pdb/ {MIRRORDIR} > {LOGFILE} 2>/dev/null')
 
+def get_all_files_and_ids():
+    pdb_files = []
+    base_dir = "data/all_pdbs"
+
+    # get all pdb files
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".ent.gz"):
+                pdb_files.append(os.path.join(root, file))
+
+    # extract the pdb ids
+    pdb_ids = [f.split("/")[-1].split(".")[0][3:].upper() for f in pdb_files]
+
+    return pdb_files, pdb_ids

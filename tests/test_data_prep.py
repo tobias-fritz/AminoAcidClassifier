@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, mock_open
 from src.data_prep import download_pdb, list_all_pdbids, get_amino_acids, get_amino_acids_from_file, center_residue_to_first_atom, rotate_residue, augment_dataset
 import torch
-from src.data import AminoAcidDataset
+from dataset import AminoAcidDataset
 
 class TestDataPrep(unittest.TestCase):
 

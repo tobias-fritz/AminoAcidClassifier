@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 from torchmetrics import ConfusionMatrix
 from typing import Dict, Tuple, Any
-from .data import AminoAcidDataset
+from .dataset import AminoAcidDataset
 import seaborn as sns
 import numpy as np
 
@@ -28,7 +28,7 @@ def plot_aa_distributions(dataset: AminoAcidDataset) -> Dict[str, Any]:
         counter_dict[residue] += 1
 
     # Plot the distribution as a pie chart
-    fig, ax = plt.subplots(figsize=(10,10))
+    fig, ax = plt.subplots(figsize=(6,6))
     ax.pie(counter_dict.values(), labels=counter_dict.keys(), autopct='%1.1f%%')
     ax.set_title('Amino acid distribution')
     
@@ -103,9 +103,9 @@ def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.D
     # Compute the confusion matrix and normalize it
     confusion_matrix = confusion_matrix.compute().numpy()
     confusion_matrix = confusion_matrix / confusion_matrix.sum(axis=1, keepdims=True) # Normalize the confusion matrix
-    confusion_matrix = np.where(confusion_matrix > 0, confusion_matrix, np.nan)  # Only show any values > 0
+    confusion_matrix = np.where(confusion_matrix > 0.01, confusion_matrix, np.nan)  # Only show any values > 0.01
      
-    fig, ax = plt.subplots(figsize=(10,10))
+    fig, ax = plt.subplots(figsize=(6,6))
     ax = sns.heatmap(confusion_matrix, square=True, annot=True, xticklabels=amino_acids, yticklabels=amino_acids, cmap='viridis', fmt='.2f', cbar=False, linewidths=0.5, linecolor='black')
     
     for _, spine in ax.spines.items():

@@ -2,7 +2,7 @@ coordinates_only.ipynb
 numbers.ipynb
 *.pdb
 /models/*
-__pycache__/
+*__pycache__/
 *.gz
 *.sh
 data/all_pdbs

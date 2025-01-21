@@ -72,7 +72,7 @@ def plot_predicted_vs_true(model: torch.nn.Module, dataloader_tuple: Tuple[torch
     return {"fig": fig, "ax": ax}
 
 
-def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader) -> Dict[str, Any]:
+def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, coord_only: bool=False) -> Dict[str, Any]:
     """
     Plots the confusion matrix for the given model and dataloader.
 
@@ -91,11 +91,22 @@ def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.D
     confusion_matrix = ConfusionMatrix(num_classes=20, task='MULTICLASS')
     confusion_matrix.reset()
 
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        model.to(device)
+
     # Update the confusion matrix with the predictions
     with torch.no_grad():   
         for coordinates, elements, residue in dataloader:
-            input_data = torch.cat((coordinates, elements), dim=2)
-            input_data = input_data.unsqueeze(1)
+            if not coord_only:
+                if torch.cuda.is_available():
+                    coordinates, elements, residue = coordinates.to(device), elements.to(device), residue.to(device)
+                input_data = torch.cat((coordinates, elements), dim=2)
+                input_data = input_data.unsqueeze(1)
+            else:
+                if torch.cuda.is_available():
+                    coordinates, residue = coordinates.to(device), residue.to(device)
+                input_data = coordinates.unsqueeze(1)
             output = model(input_data)
             target = torch.argmax(residue, dim=1)
             confusion_matrix.update(output, target)

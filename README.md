@@ -61,11 +61,6 @@ Training a CNN model to recognize amino acids based only on a set of 3D coordina
 
 <img src="figures/GLNvsGLU.png" alt="Description" width="500"/>
 
-
-### [04_analysis.ipynb](04_analysis.ipynb)
-
-Analysis and comparison of results.
-
 ## Usage
 
 ### Requirements

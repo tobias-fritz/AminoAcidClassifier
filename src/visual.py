@@ -29,7 +29,7 @@ def plot_aa_distributions(dataset: AminoAcidDataset) -> Dict[str, Any]:
 
     # Plot the distribution as a pie chart
     fig, ax = plt.subplots(figsize=(6,6))
-    ax.pie(counter_dict.values(), labels=counter_dict.keys(), autopct='%1.1f%%')
+    ax.pie(counter_dict.values(), labels=counter_dict.keys(), autopct='%1.1f%%', pctdistance=0.85, startangle=90)
     ax.set_title('Amino acid distribution')
     
     return {"fig":fig, "ax":ax, "counter":counter_dict}
@@ -104,7 +104,8 @@ def plot_confusion_matrix(model: torch.nn.Module, dataloader: torch.utils.data.D
     confusion_matrix = confusion_matrix.compute().numpy()
     confusion_matrix = confusion_matrix / confusion_matrix.sum(axis=1, keepdims=True) # Normalize the confusion matrix
     confusion_matrix = np.where(confusion_matrix > 0.01, confusion_matrix, np.nan)  # Only show any values > 0.01
-     
+    confusion_matrix = np.round(confusion_matrix, 2)
+
     fig, ax = plt.subplots(figsize=(6,6))
     ax = sns.heatmap(confusion_matrix, square=True, annot=True, xticklabels=amino_acids, yticklabels=amino_acids, cmap='viridis', fmt='.2f', cbar=False, linewidths=0.5, linecolor='black')
     

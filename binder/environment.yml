@@ -135,4 +135,3 @@ dependencies:
       - lightning-utilities==0.11.9
       - pypdb==2.4
       - torchmetrics==1.5.2
-prefix: /Users/tobias/miniconda3/envs/torch_env

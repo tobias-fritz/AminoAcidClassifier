@@ -91,7 +91,7 @@ After training, evaluate the model's performance using the test dataset. The eva
 
 You can try out the notebooks using Binder. Click the link below to launch the notebooks in an interactive environment:
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tobias/AminoAcidClassifier/main)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tobias-fritz/AminoAcidClassifier/HEAD)
 
 ## License
 

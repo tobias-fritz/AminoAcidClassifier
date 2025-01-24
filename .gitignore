@@ -1,7 +1,6 @@
 coordinates_only.ipynb
 numbers.ipynb
 *.pdb
-/models/*
 *__pycache__/
 *.gz
 *.sh

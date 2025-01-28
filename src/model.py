@@ -137,3 +137,100 @@ class AminoAcidCNN_coord_only(nn.Module):
         x = torch.relu(self.fc2(x))
         x = self.softmax(x)
         return x
+    
+# Only a transformer type model is implemented here
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000) -> None:
+        """
+        Initialize the PositionalEncoding layer.
+
+        Args:
+            d_model (int): Dimension of the model.
+            dropout (float): Dropout rate.
+            max_len (int): Maximum length of the input.
+        """
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(torch.log(torch.tensor(10000.0)) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the PositionalEncoding layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after passing through the layer.
+        """
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
+class AminoAcidTransformer(nn.Module):
+    """
+    Transformer model for classifying amino acids.
+    """
+
+    def __init__(self, input_dim: int, 
+                 num_classes: int, 
+                 num_heads: int, 
+                 num_layers: int, 
+                 hidden_dim: int, 
+                 dropout: float) -> None:
+        """
+        Initialize the AminoAcidTransformer model.
+        
+
+        Args:
+            input_dim (int): Dimension of the input.
+            num_classes (int): Number of classes.
+            num_heads (int): Number of attention heads.
+            num_layers (int): Number of transformer layers.
+            hidden_dim (int): Hidden dimension of the model.
+            dropout (float): Dropout rate.
+        """
+        super(AminoAcidTransformer, self).__init__()
+        assert hidden_dim % num_heads == 0, "hidden_dim must be divisible by num_heads"
+
+        # Define the linear layer instead of embedding layer
+        self.linear = nn.Linear(input_dim, hidden_dim)
+        
+        # Define the positional encoding layer
+        self.positional_encoding = PositionalEncoding(hidden_dim, dropout)
+        
+        # Define the transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_dim, nhead=num_heads, dim_feedforward=hidden_dim, dropout=dropout
+        )
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+        # Define the output layer
+        self.fc = nn.Linear(hidden_dim, num_classes)
+        self.softmax = nn.Softmax(dim=1)
+
+        # Initialize the weights with Kaiming initialization
+        init.kaiming_uniform_(self.fc.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after passing through the network.
+        """
+        x = self.linear(x)
+        x = self.positional_encoding(x)
+        x = self.transformer_encoder(x)
+        x = self.fc(x[:, -1, :])
+        x = self.softmax(x)
+        return x

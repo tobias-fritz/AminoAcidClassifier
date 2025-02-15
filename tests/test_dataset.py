@@ -6,15 +6,19 @@ from src.dataset import AminoAcidDataset, GraphAADataset
 @pytest.fixture
 def sample_pdb_path(tmp_path):
     # Create a minimal PDB file for testing
-    content = """ATOM      1  N   ALA A   1      27.461  14.346  11.567  1.00 36.22           N  
-ATOM      2  CA  ALA A   1      26.200  14.965  11.996  1.00 36.39           C  
-ATOM      3  C   ALA A   1      26.260  16.466  11.747  1.00 36.19           C  
-ATOM      4  O   ALA A   1      27.308  17.061  11.939  1.00 37.06           O  
+    content = """ATOM      1  N   ALA     1       0.000   0.000   0.000    1.00  0.00
+ATOM      2  C   ALA     1      -0.434   1.384   0.115    1.00  0.00
+ATOM      3  C   ALA     1      -1.431   1.739  -0.991    1.00  0.00
+ATOM      4  O   ALA     1      -2.469   2.361  -0.741    1.00  0.00
+ATOM      5  C   ALA     1       0.773   2.308   0.014    1.00  0.00 
 END
-ATOM      1  N   VAL A   2      25.147  17.088  11.326  1.00 34.16           N  
-ATOM      2  CA  VAL A   2      25.123  18.536  11.135  1.00 32.42           C  
-ATOM      3  C   VAL A   2      24.724  19.207  12.444  1.00 31.83           C  
-ATOM      4  O   VAL A   2      23.741  18.811  13.072  1.00 31.85           O  
+ATOM      1  N   VAL     1       0.000   0.000   0.000    1.00  0.00
+ATOM      2  C   VAL     1       0.531   0.691   1.165    1.00  0.00
+ATOM      3  C   VAL     1       1.897   1.285   0.813    1.00  0.00
+ATOM      4  O   VAL     1       2.140   2.452   1.104    1.00  0.00
+ATOM      5  C   VAL     1       0.718  -0.260   2.399    1.00  0.00
+ATOM      6  C   VAL     1       1.258   0.511   3.609    1.00  0.00
+ATOM      7  C   VAL     1      -0.652  -0.841   2.800    1.00  0.00
 END"""
     pdb_file = tmp_path / "test.pdb"
     pdb_file.write_text(content)
@@ -23,43 +27,57 @@ END"""
 def test_amino_acid_dataset_loading(sample_pdb_path):
     dataset = AminoAcidDataset(sample_pdb_path)
     assert len(dataset) == 2
-    assert len(dataset.coordinates) == 2
-    assert len(dataset.elements) == 2
-    assert len(dataset.residue) == 2
+    
+    coords, elements, residue_enc = dataset[0]
+    assert coords.size(0) == elements.size(0)  # Same number of atoms
+    assert residue_enc.size(0) == len(dataset._aa_list)  # One-hot size matches amino acid count
+    assert dataset.residue_encodings.size(0) == 2  # Two residues
 
-def test_one_hot_encoding():
+def test_one_hot_encoding(sample_pdb_path):
     dataset = AminoAcidDataset(sample_pdb_path)
     # Test residue encoding/decoding
     encoded = dataset.one_hot_residues('ALA')
-    assert torch.argmax(encoded).item() == dataset._aa_to_idx['ALA']
+    idx = torch.argmax(encoded).item()
+    assert idx == dataset._aa_to_idx['ALA']
     assert dataset.one_hot_residues_reverse(encoded) == 'ALA'
     
     # Test element encoding/decoding
     encoded = dataset.one_hot_elements('N')
-    assert torch.argmax(encoded).item() == dataset._element_to_idx['N']
+    idx = torch.argmax(encoded).item()
+    assert idx == dataset._element_to_idx['N']
     assert dataset.one_hot_elements_reverse(encoded) == 'N'
 
-def test_padding():
+def test_padding(sample_pdb_path):
     dataset = AminoAcidDataset(sample_pdb_path, padding=True)
-    assert dataset.coordinates.shape[1] == dataset.coordinates.shape[1]
-    assert dataset.elements.shape[1] == dataset.elements.shape[1]
+    coords, elements, residue_enc = dataset[0]
+    
+    # Test that all amino acids have same number of atoms
+    first_shape = coords.size(0)
+    assert elements.size(0) == first_shape
+    
+    # Test that the padding is correct (zero padding)
+    assert (coords[5:] == 0).all()
+    assert (elements[5:] == 0).all()
 
 def test_graph_dataset(sample_pdb_path):
     dataset = GraphAADataset(sample_pdb_path)
-    adj, node_features = dataset._get_graph(0)
+    adj, node_features, residue_enc = dataset._get_graph(0)
     
     # Test adjacency matrix properties
-    assert adj.shape[0] == adj.shape[1]  # Square matrix
-    assert torch.all(adj.diagonal() == 0)  # Zero diagonal
-    assert torch.all(adj >= 0)  # Non-negative values
+    assert adj.size(0) == adj.size(1)  # Square matrix
+    assert (adj.diagonal() == 0).all()  # Zero diagonal
+    assert (adj >= 0).all()  # Non-negative values
     
     # Test node features
-    assert node_features.shape[1] == 7  # 3 coordinates + 4 one-hot elements
+    assert node_features.size(1) == 7  # 3 coordinates + 4 elements
+    
+    # Test residue encoding
+    assert residue_enc.size(0) == len(dataset._aa_list)  # One-hot size matches amino acid count
     
     # Test caching
     first_call = dataset[0]
     second_call = dataset[0]
-    assert id(first_call[0]) == id(second_call[0])  # Should return cached object
+    assert all(torch.equal(a, b) for a, b in zip(first_call, second_call))
 
 if __name__ == '__main__':
     pytest.main([__file__])

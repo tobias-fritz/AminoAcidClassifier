@@ -34,6 +34,15 @@ class AminoAcidDataset(torch.utils.data.Dataset):
                 self.elements.append(torch.stack(current_data['elements']))
                 self.residue.append(current_data['residue'])
                 current_data = {'coords': [], 'elements': [], 'residue': None}
+
+        # One hot encoding for residues
+        self.residue_encodings = torch.stack([self.one_hot_residues(res) for res in self._amino_acids])
+        self.residue = torch.stack(self.residue)
+
+
+        # One hot encode the elements
+        self.elements = [torch.stack(e) for e in self.elements]
+        
         
         if padding:
             self.coordinates = nn.utils.rnn.pad_sequence(self.coordinates, batch_first=True)
